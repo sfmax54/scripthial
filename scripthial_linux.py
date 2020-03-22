@@ -11,11 +11,11 @@ g_glow = False
 g_rcs = False
 g_aimbot = True
 g_aimbot_rcs = True
-g_aimbot_head = False
-g_aimbot_fov = 1.0 / 180.0
-g_aimbot_smooth = 4.5
+g_aimbot_head = True
+g_aimbot_fov = 3.0 / 180.0
+g_aimbot_smooth = 9
 g_aimbot_key = 107
-g_triggerbot_key = 111
+g_triggerbot_key = 110
 g_exit_key = 72
 
 g_old_punch = 0

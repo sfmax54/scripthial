@@ -11,9 +11,9 @@ g_glow = False
 g_rcs = False
 g_aimbot = True
 g_aimbot_rcs = True
-g_aimbot_head = True
-g_aimbot_fov = 3.0 / 180.0
-g_aimbot_smooth = 9
+g_aimbot_head = False
+g_aimbot_fov = 2.0 / 180.0
+g_aimbot_smooth = 11
 g_aimbot_key = 107
 g_triggerbot_key = 110
 g_exit_key = 72
@@ -362,12 +362,15 @@ class NetVarList:
         table = NetVarTable("DT_BaseEntity")
         self.m_iTeamNum = table.get_offset("m_iTeamNum")
         self.m_vecOrigin = table.get_offset("m_vecOrigin")
+        self.m_bSpotted = table.get_offset("m_bSpotted")
         table = NetVarTable("DT_CSPlayer")
         self.m_hActiveWeapon = table.get_offset("m_hActiveWeapon")
         self.m_iShotsFired = table.get_offset("m_iShotsFired")
         self.m_iCrossHairID = table.get_offset("m_bHasDefuser") + 0x7C
         table = NetVarTable("DT_BaseAnimating")
         self.m_dwBoneMatrix = table.get_offset("m_nForceBone") + 0x2C
+        #table = NetVarTable("DT_BaseCombatCharacter")
+        #self.m_hActiveWeapon = table.get_offset("m_hActiveWeapon")
         table = NetVarTable("DT_BaseAttributableItem")
         self.m_iItemDefinitionIndex = table.get_offset("m_iItemDefinitionIndex")
         self.entityList = self.__get_entity_list()
@@ -413,8 +416,8 @@ class Player:
         return mem.read_i32(self.address + nv.m_iCrossHairID)
 
     def get_weapon(self):
-        a0 = mem.read_i32(self.address + nv.m_hActiveWeapon)
-        return mem.read_i64(nv.entityList + ((a0 & 0xFFF) - 1) * 0x10)
+        a0 = mem.read_i32(self.address + nv.m_hActiveWeapon) & 0xFFF
+        return mem.read_i64(nv.entityList + (a0 - 1) * 0x10)
 
     def get_weapon_id(self):
         return mem.read_i32(self.get_weapon() + nv.m_iItemDefinitionIndex)
@@ -446,6 +449,8 @@ class Player:
         health = self.get_health()
         return self.address != 0 and self.get_life_state() == 0 and 0 < health < 1338
 
+    def is_spotted(self):
+        return mem.read_i32(self.address + nv.m_bSpotted)
 
 class Engine:
     @staticmethod
@@ -678,6 +683,7 @@ if __name__ == "__main__":
     print("    m_iTeamNum:         " + hex(nv.m_iTeamNum))
     print("    m_vecOrigin:        " + hex(nv.m_vecOrigin))
     print("    m_hActiveWeapon:    " + hex(nv.m_hActiveWeapon))
+    print("    m_iItemDefinitionIndex:    " + hex(nv.m_iItemDefinitionIndex))
     print("    m_iShotsFired:      " + hex(nv.m_iShotsFired))
     print("    m_iCrossHairID:     " + hex(nv.m_iCrossHairID))
     print("    m_dwBoneMatrix:     " + hex(nv.m_dwBoneMatrix))
@@ -690,22 +696,8 @@ if __name__ == "__main__":
             try:
                 self = Entity.get_client_entity(Engine.get_local_player())
                 fl_sensitivity = _sensitivity.get_float()
-                view_angle = Engine.get_view_angles()
-                if g_glow:
-                    for i in range(0, mem.read_i32(nv.dwGlowObjectManager + 0x10)):
-                        index = 0x40 * i
-                        entity = Player(mem.read_i64(nv.dwGlowPointer + index))
-                        if not entity.is_valid():
-                            continue
-                        if not mp_teammates_are_enemies.get_int() and self.get_team_num() == entity.get_team_num():
-                            continue
-                        entity_health = entity.get_health() / 100.0
-                        mem.write_float(nv.dwGlowPointer + index + 0x08, 1.0 - entity_health)  # r
-                        mem.write_float(nv.dwGlowPointer + index + 0x0C, entity_health)        # g
-                        mem.write_float(nv.dwGlowPointer + index + 0x10, 0.0)                  # b
-                        mem.write_float(nv.dwGlowPointer + index + 0x14, 0.8)                  # a
-                        mem.write_i8(nv.dwGlowPointer + index + 0x28, 1)
-                        mem.write_i8(nv.dwGlowPointer + index + 0x29, 0)
+                view_angle = Engine.get_view_angles()            
+                #continue
                 if InputSystem.is_button_down(g_triggerbot_key):
                     cross_id = self.get_cross_index()
                     if cross_id == 0:
@@ -717,7 +709,8 @@ if __name__ == "__main__":
                     g_current_tick = self.get_tick_count()
                     if not _target.is_valid() and not get_best_target(view_angle, self):
                         continue
-                    aim_at_target(fl_sensitivity, view_angle, get_target_angle(self, _target, _target_bone))
+                    if _target.is_spotted():
+                        aim_at_target(fl_sensitivity, view_angle, get_target_angle(self, _target, _target_bone))
                 else:
                     target_set(Player(0))
                 if g_rcs:
